@@ -31,7 +31,15 @@ func TestExtractCommandAction(t *testing.T) {
 	}{
 		{"adjust_volume", params, func(v *vehicle.Vehicle) error { return v.SetVolume(ctx, 0.0) }, nil},
 		{"adjust_volume", nil, nil, &protocol.NominalError{Details: fmt.Errorf("missing volume param")}},
-		{"remote_boombox", params, nil, proxy.ErrCommandNotImplemented},
+		{"remote_boombox", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"navigation_gps_request", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"navigation_sc_request", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"navigation_waypoints_request", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"dashcam_save_clip", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"take_drivenote", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"upcoming_calendar_entries", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"remote_auto_steering_wheel_heat_climate_request", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"remote_steering_wheel_heat_level_request", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"invalid_command", params, nil, &inet.HTTPError{Code: http.StatusBadRequest, Message: "{\"response\":null,\"error\":\"invalid_command\",\"error_description\":\"\"}"}},
 	}
 

@@ -67,8 +67,6 @@ func ExtractCommandAction(ctx context.Context, command string, params RequestPar
 			return nil, err
 		}
 		return func(v *vehicle.Vehicle) error { return v.SetVolume(ctx, float32(volume)) }, nil
-	case "remote_boombox":
-		return nil, ErrCommandNotImplemented
 	case "media_next_fav":
 		return func(v *vehicle.Vehicle) error { return v.MediaNextFavorite(ctx) }, nil
 	case "media_prev_fav":
@@ -504,6 +502,20 @@ func ExtractCommandAction(ctx context.Context, command string, params RequestPar
 		}, nil
 	case "cancel_software_update":
 		return func(v *vehicle.Vehicle) error { return v.CancelSoftwareUpdate(ctx) }, nil
+	// These endpoints have no signed-command protobuf action. Returning
+	// ErrCommandUseRESTAPI makes the proxy forward the request to Tesla's REST
+	// API, where they work. remote_boombox works over REST per
+	// Teslemetry/hass-teslemetry#31.
+	case "navigation_gps_request",
+		"navigation_sc_request",
+		"navigation_waypoints_request",
+		"dashcam_save_clip",
+		"take_drivenote",
+		"upcoming_calendar_entries",
+		"remote_auto_steering_wheel_heat_climate_request",
+		"remote_steering_wheel_heat_level_request",
+		"remote_boombox":
+		return nil, ErrCommandUseRESTAPI
 	// Sharing options. These endpoints often require server-side processing, which prevents strict
 	// end-to-end authentication.
 	case "navigation_request":
