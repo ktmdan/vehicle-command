@@ -328,12 +328,41 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			}
 			return
 		}
+		if len(path) == 6 && path[5] == "command" {
+			vin := path[4]
+			if len(vin) != vinLength {
+				writeJSONError(w, http.StatusNotFound, errors.New("expected 17-character VIN in path (do not user Fleet API ID)"))
+				return
+			}
+			p.handleCommandDiscovery(w, req)
+			return
+		}
 		if len(path) == 5 && path[4] == "fleet_telemetry_config" {
 			p.handleFleetTelemetryConfig(acct, w, req)
 			return
 		}
 	}
 	p.forwardRequest(acct, w, req)
+}
+
+// handleCommandDiscovery serves GET /api/1/vehicles/{vin}/command, returning
+// the list of command endpoints the proxy handles. The response format mirrors
+// Tesla's Fleet API enabled_commands discovery (each entry prefixed with
+// "/command/"), so existing clients can use the same parsing.
+func (p *Proxy) handleCommandDiscovery(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		writeJSONError(w, http.StatusMethodNotAllowed, errors.New("method must be GET"))
+		return
+	}
+	paths := make([]string, 0, len(EnabledCommands))
+	for _, c := range EnabledCommands {
+		paths = append(paths, "/command/"+c)
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(map[string][]string{"enabled_commands": paths}); err != nil {
+		log.Error("Error encoding command discovery response: %s", err)
+	}
 }
 
 func (p *Proxy) handleHealthCheck(w http.ResponseWriter, req *http.Request) {

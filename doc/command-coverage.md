@@ -25,6 +25,7 @@ protocol).
 | charge_start | ✓ | charging-start | ChargeStart | |
 | charge_stop | ✓ | charging-stop | ChargeStop | |
 | clear_pin_to_drive_admin | ✓ | clear-pin-to-drive | ClearPINToDrive | |
+| dashcam_save_clip | REST fwd | — | — | No protobuf action; saves dashcam footage server-side |
 | door_lock | ✓ | lock | Lock | |
 | door_unlock | ✓ | unlock | Unlock | |
 | erase_user_data | ✓ | erase-guest-data | EraseGuestData | |
@@ -69,6 +70,7 @@ protocol).
 | set_temps | ✓ | climate-set-temp | ChangeClimateTemp | |
 | set_valet_mode | ✓ | valet-mode-on / valet-mode-off | SetValetMode | |
 | set_vehicle_name | ✓ | set-vehicle-name | SetVehicleName | |
+| share | REST fwd | — | — | No protobuf action; sends a location to the car (sister to navigation_request) |
 | speed_limit_activate | ✓ | speed-limit-activate | ActivateSpeedLimit | |
 | speed_limit_clear_pin | ✓ | speed-limit-clear-pin | ClearSpeedLimitPIN | |
 | speed_limit_clear_pin_admin | ✓ | speed-limit-clear-pin-admin | ClearSpeedLimitPINAdminAction | |
@@ -81,8 +83,6 @@ protocol).
 
 ## Endpoints not on the Fleet *vehicle-commands* page
 
-- `dashcam_save_clip` (legacy Owner API) and `take_drivenote` (Teslemetry) have
-  no protobuf action; the proxy returns `ErrCommandUseRESTAPI` (REST fwd).
 - `set_managed_charge_current_request`, `set_managed_charger_location`,
   `set_managed_scheduled_charging_time` are proxy extras (managed charging), not
   part of the vehicle-commands page.
@@ -95,3 +95,9 @@ with this repo, which *does* sign `media_*`, `window_control`, `erase_user_data`
 The authoritative REST-only set for this protocol is the proxy's own
 `ErrCommandUseRESTAPI` returns (the "REST fwd" rows above). Signing becomes the
 default in 2025 per Teslemetry.
+
+## Discovery endpoint
+
+GET `/api/1/vehicles/{vin}/command` returns `{"enabled_commands": [...]}` listing
+every endpoint the proxy explicitly handles (signed and REST-forward). This
+mirrors the Fleet API's discovery response format.

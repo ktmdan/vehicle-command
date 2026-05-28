@@ -21,7 +21,94 @@ var (
 
 	// ErrCommandUseRESTAPI indicates vehicle/command is not supported by the protocol
 	ErrCommandUseRESTAPI = errors.New("command requires using the REST API")
+)
 
+// EnabledCommands lists every command endpoint the proxy handles explicitly
+// (signed commands and REST-forward stubs). The /command discovery endpoint
+// returns this list; a test asserts it stays in sync with the switch in
+// ExtractCommandAction.
+var EnabledCommands = []string{
+	"actuate_trunk",
+	"add_charge_schedule",
+	"add_precondition_schedule",
+	"adjust_volume",
+	"auto_conditioning_start",
+	"auto_conditioning_stop",
+	"cancel_software_update",
+	"charge_max_range",
+	"charge_port_door_close",
+	"charge_port_door_open",
+	"charge_standard",
+	"charge_start",
+	"charge_stop",
+	"clear_pin_to_drive_admin",
+	"close_tonneau",
+	"dashcam_save_clip",
+	"door_lock",
+	"door_unlock",
+	"erase_user_data",
+	"flash_lights",
+	"guest_mode",
+	"honk_horn",
+	"keep_accessory_power_mode",
+	"media_next_fav",
+	"media_next_track",
+	"media_prev_fav",
+	"media_prev_track",
+	"media_toggle_playback",
+	"media_volume_down",
+	"media_volume_up",
+	"navigation_gps_request",
+	"navigation_request",
+	"navigation_sc_request",
+	"navigation_waypoints_request",
+	"open_tonneau",
+	"remote_auto_seat_climate_request",
+	"remote_auto_steering_wheel_heat_climate_request",
+	"remote_boombox",
+	"remote_seat_cooler_request",
+	"remote_seat_heater_request",
+	"remote_start_drive",
+	"remote_steering_wheel_heat_level_request",
+	"remote_steering_wheel_heater_request",
+	"remove_charge_schedule",
+	"remove_precondition_schedule",
+	"reset_pin_to_drive_pin",
+	"reset_valet_pin",
+	"schedule_software_update",
+	"set_bioweapon_mode",
+	"set_cabin_overheat_protection",
+	"set_charge_limit",
+	"set_charging_amps",
+	"set_climate_keeper_mode",
+	"set_cop_temp",
+	"set_low_power_mode",
+	"set_managed_charge_current_request",
+	"set_managed_charger_location",
+	"set_managed_scheduled_charging_time",
+	"set_pin_to_drive",
+	"set_preconditioning_max",
+	"set_scheduled_charging",
+	"set_scheduled_departure",
+	"set_sentry_mode",
+	"set_temps",
+	"set_valet_mode",
+	"set_vehicle_name",
+	"share",
+	"speed_limit_activate",
+	"speed_limit_clear_pin",
+	"speed_limit_clear_pin_admin",
+	"speed_limit_deactivate",
+	"speed_limit_set_limit",
+	"stop_tonneau",
+	"sun_roof_control",
+	"trigger_homelink",
+	"upcoming_calendar_entries",
+	"wake_up",
+	"window_control",
+}
+
+var (
 	seatPositions = []vehicle.SeatPosition{
 		vehicle.SeatFrontLeft,
 		vehicle.SeatFrontRight,
@@ -502,19 +589,18 @@ func ExtractCommandAction(ctx context.Context, command string, params RequestPar
 		}, nil
 	case "cancel_software_update":
 		return func(v *vehicle.Vehicle) error { return v.CancelSoftwareUpdate(ctx) }, nil
-	// These endpoints have no signed-command protobuf action. Returning
-	// ErrCommandUseRESTAPI makes the proxy forward the request to Tesla's REST
-	// API, where they work. remote_boombox works over REST per
-	// Teslemetry/hass-teslemetry#31.
-	case "navigation_gps_request",
+	// These Fleet API endpoints have no signed-command protobuf in this repo.
+	// Returning ErrCommandUseRESTAPI causes the proxy to forward the request to
+	// Tesla's REST API, where they are handled server-side.
+	case "dashcam_save_clip",
+		"navigation_gps_request",
 		"navigation_sc_request",
 		"navigation_waypoints_request",
-		"dashcam_save_clip",
-		"take_drivenote",
-		"upcoming_calendar_entries",
 		"remote_auto_steering_wheel_heat_climate_request",
+		"remote_boombox",
 		"remote_steering_wheel_heat_level_request",
-		"remote_boombox":
+		"share",
+		"upcoming_calendar_entries":
 		return nil, ErrCommandUseRESTAPI
 	// Sharing options. These endpoints often require server-side processing, which prevents strict
 	// end-to-end authentication.

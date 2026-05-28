@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/teslamotors/vehicle-command/pkg/connector/inet"
@@ -36,7 +37,7 @@ func TestExtractCommandAction(t *testing.T) {
 		{"navigation_sc_request", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"navigation_waypoints_request", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"dashcam_save_clip", params, nil, proxy.ErrCommandUseRESTAPI},
-		{"take_drivenote", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"share", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"upcoming_calendar_entries", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"remote_auto_steering_wheel_heat_climate_request", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"remote_steering_wheel_heat_level_request", params, nil, proxy.ErrCommandUseRESTAPI},
@@ -76,6 +77,20 @@ func TestSunRoofControl(t *testing.T) {
 			}
 		} else if err == nil || err.Error() != test.expected.Error() {
 			t.Errorf("state %q: expected error %v, got %v", test.state, test.expected, err)
+		}
+	}
+}
+
+func TestEnabledCommandsAreHandled(t *testing.T) {
+	ctx := context.Background()
+	for _, cmd := range proxy.EnabledCommands {
+		_, err := proxy.ExtractCommandAction(ctx, cmd, proxy.RequestParameters{})
+		// The default case returns an inet.HTTPError whose Message contains
+		// "invalid_command". Any other return (success or a different error
+		// such as a missing-parameter error or ErrCommandUseRESTAPI) means the
+		// command IS explicitly handled.
+		if err != nil && strings.Contains(err.Error(), "invalid_command") {
+			t.Errorf("EnabledCommands contains %q but switch returns invalid_command", cmd)
 		}
 	}
 }
