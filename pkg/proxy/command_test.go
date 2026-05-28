@@ -48,3 +48,26 @@ func TestExtractCommandAction(t *testing.T) {
 		}
 	}
 }
+
+func TestSunRoofControl(t *testing.T) {
+	ctx := context.Background()
+	tests := []struct {
+		state    string
+		expected error
+	}{
+		{"vent", nil},
+		{"close", nil},
+		{"bogus", errors.New("sun_roof_control state must be 'vent' or 'close'")},
+	}
+	for _, test := range tests {
+		params := proxy.RequestParameters{"state": test.state}
+		action, err := proxy.ExtractCommandAction(ctx, "sun_roof_control", params)
+		if test.expected == nil {
+			if err != nil || action == nil {
+				t.Errorf("state %q: expected an action and no error, got action=%p err=%v", test.state, action, err)
+			}
+		} else if err == nil || err.Error() != test.expected.Error() {
+			t.Errorf("state %q: expected error %v, got %v", test.state, test.expected, err)
+		}
+	}
+}

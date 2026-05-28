@@ -508,6 +508,19 @@ func ExtractCommandAction(ctx context.Context, command string, params RequestPar
 	// end-to-end authentication.
 	case "navigation_request":
 		return nil, ErrCommandUseRESTAPI
+	case "sun_roof_control":
+		state, err := params.getString("state", true)
+		if err != nil {
+			return nil, err
+		}
+		switch state {
+		case "vent":
+			return func(v *vehicle.Vehicle) error { return v.VentSunroof(ctx) }, nil
+		case "close":
+			return func(v *vehicle.Vehicle) error { return v.CloseSunroof(ctx) }, nil
+		default:
+			return nil, errors.New("sun_roof_control state must be 'vent' or 'close'")
+		}
 	case "window_control":
 		// Latitude and longitude are not required for vehicles that support this protocol.
 		cmd, err := params.getString("command", true)
