@@ -484,7 +484,8 @@ func extractCommandAction(ctx context.Context, req *http.Request, command string
 		return nil, &inet.HTTPError{Code: http.StatusBadRequest, Message: "could not read request body"}
 	}
 	// Reset the body so the request can still be forwarded to Tesla's REST API
-	// when the command returns ErrCommandUseRESTAPI.
+	// on any REST-forward path (ErrCommandUseRESTAPI, unsupported protocol,
+	// unknown command).
 	req.Body = io.NopCloser(bytes.NewReader(body))
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &params); err != nil {

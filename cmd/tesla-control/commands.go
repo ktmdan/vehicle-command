@@ -306,7 +306,7 @@ var commands = map[string]*Command{
 		},
 	},
 	"pin-to-drive": {
-		help:             "Enable or disable PIN to Drive. STATE 'on' requires PIN.",
+		help:             "Enable or disable PIN to Drive (Fleet API: set_pin_to_drive). STATE 'on' requires PIN.",
 		requiresAuth:     true,
 		requiresFleetAPI: false,
 		args: []Argument{
@@ -332,7 +332,7 @@ var commands = map[string]*Command{
 		},
 	},
 	"clear-pin-to-drive": {
-		help:             "Deactivate PIN to Drive and clear the PIN (requires owner/fleet-manager)",
+		help:             "Deactivate PIN to Drive and clear the PIN (Fleet API: clear_pin_to_drive_admin; requires fleet manager or owner)",
 		requiresAuth:     true,
 		requiresFleetAPI: false,
 		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
@@ -340,7 +340,7 @@ var commands = map[string]*Command{
 		},
 	},
 	"reset-pin-to-drive-pin": {
-		help:             "Remove PIN to Drive",
+		help:             "Remove PIN to Drive (Fleet API: reset_pin_to_drive_pin; non-admin)",
 		requiresAuth:     true,
 		requiresFleetAPI: false,
 		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
@@ -524,28 +524,37 @@ var commands = map[string]*Command{
 		},
 	},
 	"seat-cooler": {
-		help:             "Set seat cooler to LEVEL (0-3) for SEAT (front-left or front-right)",
+		help:             "Set seat cooler to LEVEL for SEAT (front-left or front-right)",
 		requiresAuth:     true,
 		requiresFleetAPI: false,
 		args: []Argument{
-			{name: "LEVEL", help: "Cooling level 0 (off) to 3 (high)"},
 			{name: "SEAT", help: "'front-left' or 'front-right'"},
+			{name: "LEVEL", help: "One of: off, low, medium, high"},
 		},
 		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
-			level, err := strconv.Atoi(args["LEVEL"])
-			if err != nil || level < 0 || level > 3 {
-				return fmt.Errorf("seat cooler level must be an integer 0-3")
-			}
 			var seat vehicle.SeatPosition
 			switch strings.ToLower(args["SEAT"]) {
-			case "front-left", "l":
+			case "front-left":
 				seat = vehicle.SeatFrontLeft
-			case "front-right", "r":
+			case "front-right":
 				seat = vehicle.SeatFrontRight
 			default:
 				return fmt.Errorf("seat must be 'front-left' or 'front-right'")
 			}
-			return car.SetSeatCooler(ctx, vehicle.Level(level), seat)
+			var level vehicle.Level
+			switch strings.ToLower(args["LEVEL"]) {
+			case "off":
+				level = vehicle.LevelOff
+			case "low":
+				level = vehicle.LevelLow
+			case "medium", "med":
+				level = vehicle.LevelMed
+			case "high":
+				level = vehicle.LevelHigh
+			default:
+				return fmt.Errorf("seat cooler level must be one of: off, low, medium, high")
+			}
+			return car.SetSeatCooler(ctx, level, seat)
 		},
 	},
 	"climate-set-temp": {
