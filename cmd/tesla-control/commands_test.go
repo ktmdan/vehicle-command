@@ -58,6 +58,18 @@ func TestClimateKeeperAndSunroofCommands(t *testing.T) {
 	}
 }
 
+func TestSpeedLimitCommands(t *testing.T) {
+	for _, name := range []string{
+		"speed-limit-activate",
+		"speed-limit-deactivate",
+		"speed-limit-set-limit",
+		"speed-limit-clear-pin",
+		"speed-limit-clear-pin-admin",
+	} {
+		requireCommand(t, name)
+	}
+}
+
 func TestComfortParityCommands(t *testing.T) {
 	for _, name := range []string{
 		"cabin-overheat-protection",

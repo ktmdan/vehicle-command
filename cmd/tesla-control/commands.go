@@ -1508,4 +1508,60 @@ var commands = map[string]*Command{
 			return nil
 		},
 	},
+	"speed-limit-activate": {
+		help:             "Activate Speed Limit Mode with a 4-digit PIN",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "PIN", help: "4-digit speed limit PIN"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			return car.ActivateSpeedLimit(ctx, args["PIN"])
+		},
+	},
+	"speed-limit-deactivate": {
+		help:             "Deactivate Speed Limit Mode using PIN",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "PIN", help: "4-digit speed limit PIN"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			return car.DeactivateSpeedLimit(ctx, args["PIN"])
+		},
+	},
+	"speed-limit-set-limit": {
+		help:             "Set the Speed Limit Mode maximum to MPH",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "MPH", help: "Maximum speed in miles per hour"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			mph, err := strconv.ParseFloat(args["MPH"], 64)
+			if err != nil {
+				return fmt.Errorf("error parsing MPH")
+			}
+			return car.SpeedLimitSetLimitMPH(ctx, mph)
+		},
+	},
+	"speed-limit-clear-pin": {
+		help:             "Clear the Speed Limit Mode PIN",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "PIN", help: "4-digit speed limit PIN"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			return car.ClearSpeedLimitPIN(ctx, args["PIN"])
+		},
+	},
+	"speed-limit-clear-pin-admin": {
+		help:             "Clear the Speed Limit Mode PIN as fleet manager (no PIN required)",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
+			return car.ClearSpeedLimitPINAdminAction(ctx)
+		},
+	},
 }
