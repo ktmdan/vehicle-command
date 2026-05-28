@@ -460,6 +460,10 @@ func (p *Proxy) loadVehicleAndCommandFromRequest(ctx context.Context, acct *acco
 
 	commandToExecuteFunc, err := extractCommandAction(ctx, req, command)
 	if err != nil {
+		if err == ErrCommandUseRESTAPI {
+			// Caller (ServeHTTP) will forward the request to the REST API.
+			return nil, nil, err
+		}
 		writeJSONError(w, http.StatusBadRequest, err)
 		return nil, nil, err
 	}
@@ -479,6 +483,9 @@ func extractCommandAction(ctx context.Context, req *http.Request, command string
 	if err != nil {
 		return nil, &inet.HTTPError{Code: http.StatusBadRequest, Message: "could not read request body"}
 	}
+	// Reset the body so the request can still be forwarded to Tesla's REST API
+	// when the command returns ErrCommandUseRESTAPI.
+	req.Body = io.NopCloser(bytes.NewReader(body))
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &params); err != nil {
 			return nil, &inet.HTTPError{Code: http.StatusBadRequest, Message: "error occurred while parsing request parameters"}
