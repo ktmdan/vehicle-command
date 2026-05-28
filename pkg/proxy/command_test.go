@@ -38,6 +38,7 @@ func TestExtractCommandAction(t *testing.T) {
 		{"navigation_waypoints_request", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"dashcam_save_clip", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"share", params, nil, proxy.ErrCommandUseRESTAPI},
+		{"take_drivenote", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"upcoming_calendar_entries", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"remote_auto_steering_wheel_heat_climate_request", params, nil, proxy.ErrCommandUseRESTAPI},
 		{"remote_steering_wheel_heat_level_request", params, nil, proxy.ErrCommandUseRESTAPI},

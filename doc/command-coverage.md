@@ -77,6 +77,7 @@ protocol).
 | speed_limit_deactivate | ✓ | speed-limit-deactivate | DeactivateSpeedLimit | |
 | speed_limit_set_limit | ✓ | speed-limit-set-limit | SpeedLimitSetLimitMPH | |
 | sun_roof_control | ✓ | sunroof | VentSunroof / CloseSunroof / ChangeSunroofState | Signed command (this PR) |
+| take_drivenote | REST fwd | — | — | Documented (timdorr); not on current Fleet API page but kept for compatibility |
 | trigger_homelink | ✓ | homelink | TriggerHomelink | |
 | upcoming_calendar_entries | REST fwd | — | — | REST/data; no protobuf action |
 | window_control | ✓ | windows-vent / windows-close | VentWindows / CloseWindows | |
@@ -101,3 +102,11 @@ default in 2025 per Teslemetry.
 GET `/api/1/vehicles/{vin}/command` returns `{"enabled_commands": [...]}` listing
 every endpoint the proxy explicitly handles (signed and REST-forward). This
 mirrors the Fleet API's discovery response format.
+
+## Non-command endpoints
+
+The proxy also explicitly handles one non-command vehicle endpoint:
+
+- `GET /api/1/vehicles/{vin}/screenshot` — forwards to Tesla's REST API; returns
+  a PNG capture of the vehicle's infotainment display. Not all vehicles support
+  this endpoint.

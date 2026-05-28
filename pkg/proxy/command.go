@@ -102,6 +102,7 @@ var EnabledCommands = []string{
 	"speed_limit_set_limit",
 	"stop_tonneau",
 	"sun_roof_control",
+	"take_drivenote",
 	"trigger_homelink",
 	"upcoming_calendar_entries",
 	"wake_up",
@@ -600,6 +601,7 @@ func ExtractCommandAction(ctx context.Context, command string, params RequestPar
 		"remote_boombox",
 		"remote_steering_wheel_heat_level_request",
 		"share",
+		"take_drivenote",
 		"upcoming_calendar_entries":
 		return nil, ErrCommandUseRESTAPI
 	// Sharing options. These endpoints often require server-side processing, which prevents strict

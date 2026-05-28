@@ -337,6 +337,19 @@ func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 			p.handleCommandDiscovery(w, req)
 			return
 		}
+		if len(path) == 6 && path[5] == "screenshot" {
+			vin := path[4]
+			if len(vin) != vinLength {
+				writeJSONError(w, http.StatusNotFound, errors.New("expected 17-character VIN in path (do not user Fleet API ID)"))
+				return
+			}
+			if req.Method != http.MethodGet {
+				writeJSONError(w, http.StatusMethodNotAllowed, errors.New("method must be GET"))
+				return
+			}
+			p.forwardRequest(acct, w, req)
+			return
+		}
 		if len(path) == 5 && path[4] == "fleet_telemetry_config" {
 			p.handleFleetTelemetryConfig(acct, w, req)
 			return
