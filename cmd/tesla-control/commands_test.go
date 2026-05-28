@@ -36,6 +36,26 @@ func TestMinutesAfterMidnight(t *testing.T) {
 	}
 }
 
+func requireCommand(t *testing.T, name string) {
+	t.Helper()
+	cmd, ok := commands[name]
+	if !ok {
+		t.Fatalf("command %q is not registered", name)
+	}
+	if cmd.help == "" {
+		t.Errorf("command %q has empty help", name)
+	}
+	if cmd.handler == nil {
+		t.Errorf("command %q has nil handler", name)
+	}
+}
+
+func TestClimateKeeperAndSunroofCommands(t *testing.T) {
+	for _, name := range []string{"climate-keeper", "sunroof"} {
+		requireCommand(t, name)
+	}
+}
+
 func TestGetDays(t *testing.T) {
 	type params struct {
 		str   string

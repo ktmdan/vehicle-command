@@ -332,6 +332,48 @@ var commands = map[string]*Command{
 			return car.ClimateOff(ctx)
 		},
 	},
+	"climate-keeper": {
+		help:             "Set climate keeper mode to STATE (off, on, dog, camp)",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "STATE", help: "One of: off, on, dog, camp"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			var mode vehicle.ClimateKeeperMode
+			switch strings.ToLower(args["STATE"]) {
+			case "off":
+				mode = vehicle.ClimateKeeperModeOff
+			case "on":
+				mode = vehicle.ClimateKeeperModeOn
+			case "dog":
+				mode = vehicle.ClimateKeeperModeDog
+			case "camp":
+				mode = vehicle.ClimateKeeperModeCamp
+			default:
+				return fmt.Errorf("climate keeper mode must be one of: off, on, dog, camp")
+			}
+			return car.SetClimateKeeperMode(ctx, mode, false)
+		},
+	},
+	"sunroof": {
+		help:             "Control sunroof: STATE is 'vent' or 'close'",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "STATE", help: "'vent' or 'close'"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			switch strings.ToLower(args["STATE"]) {
+			case "vent":
+				return car.VentSunroof(ctx)
+			case "close":
+				return car.CloseSunroof(ctx)
+			default:
+				return fmt.Errorf("sunroof state must be 'vent' or 'close'")
+			}
+		},
+	},
 	"climate-set-temp": {
 		help:             "Set temperature (Celsius)",
 		requiresAuth:     true,
