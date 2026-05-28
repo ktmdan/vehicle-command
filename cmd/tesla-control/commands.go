@@ -1614,4 +1614,35 @@ var commands = map[string]*Command{
 			return car.ClearSpeedLimitPINAdminAction(ctx)
 		},
 	},
+	"homelink": {
+		help:             "Trigger HomeLink at location LATITUDE, LONGITUDE",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "LATITUDE", help: "Current latitude (decimal degrees)"},
+			{name: "LONGITUDE", help: "Current longitude (decimal degrees)"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			lat, err := strconv.ParseFloat(args["LATITUDE"], 32)
+			if err != nil {
+				return fmt.Errorf("error parsing LATITUDE")
+			}
+			lon, err := strconv.ParseFloat(args["LONGITUDE"], 32)
+			if err != nil {
+				return fmt.Errorf("error parsing LONGITUDE")
+			}
+			return car.TriggerHomelink(ctx, float32(lat), float32(lon))
+		},
+	},
+	"set-vehicle-name": {
+		help:             "Set the vehicle's name to NAME",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "NAME", help: "New vehicle name"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			return car.SetVehicleName(ctx, args["NAME"])
+		},
+	},
 }

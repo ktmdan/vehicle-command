@@ -148,3 +148,9 @@ func TestParseChargingPolicy(t *testing.T) {
 		t.Errorf("parseChargingPolicy(\"bogus\") should error")
 	}
 }
+
+func TestMiscParityCommands(t *testing.T) {
+	for _, name := range []string{"homelink", "set-vehicle-name"} {
+		requireCommand(t, name)
+	}
+}
