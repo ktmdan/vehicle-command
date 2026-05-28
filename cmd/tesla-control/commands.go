@@ -374,6 +374,117 @@ var commands = map[string]*Command{
 			}
 		},
 	},
+	"cabin-overheat-protection": {
+		help:             "Set cabin overheat protection to STATE ('on' or 'off')",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "STATE", help: "'on' or 'off'"},
+		},
+		optional: []Argument{
+			{name: "FAN_ONLY", help: "'on' to enable fan-only mode (default off)"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			var enabled bool
+			switch strings.ToLower(args["STATE"]) {
+			case "on":
+				enabled = true
+			case "off":
+				enabled = false
+			default:
+				return fmt.Errorf("cabin overheat protection state must be 'on' or 'off'")
+			}
+			fanOnly := strings.ToLower(args["FAN_ONLY"]) == "on"
+			return car.SetCabinOverheatProtection(ctx, enabled, fanOnly)
+		},
+	},
+	"cop-temp": {
+		help:             "Set cabin overheat protection temperature to LEVEL (low, medium, high)",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "LEVEL", help: "One of: low, medium, high"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			var level vehicle.Level
+			switch strings.ToLower(args["LEVEL"]) {
+			case "low":
+				level = vehicle.LevelLow
+			case "medium", "med":
+				level = vehicle.LevelMed
+			case "high":
+				level = vehicle.LevelHigh
+			default:
+				return fmt.Errorf("cop temperature level must be one of: low, medium, high")
+			}
+			return car.SetCabinOverheatProtectionTemperature(ctx, level)
+		},
+	},
+	"bioweapon-mode": {
+		help:             "Set bioweapon defense mode to STATE ('on' or 'off')",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "STATE", help: "'on' or 'off'"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			var enabled bool
+			switch strings.ToLower(args["STATE"]) {
+			case "on":
+				enabled = true
+			case "off":
+				enabled = false
+			default:
+				return fmt.Errorf("bioweapon defense mode state must be 'on' or 'off'")
+			}
+			return car.SetBioweaponDefenseMode(ctx, enabled, false)
+		},
+	},
+	"precondition-max": {
+		help:             "Set preconditioning max to STATE ('on' or 'off')",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "STATE", help: "'on' or 'off'"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			var enabled bool
+			switch strings.ToLower(args["STATE"]) {
+			case "on":
+				enabled = true
+			case "off":
+				enabled = false
+			default:
+				return fmt.Errorf("preconditioning max state must be 'on' or 'off'")
+			}
+			return car.SetPreconditioningMax(ctx, enabled, false)
+		},
+	},
+	"seat-cooler": {
+		help:             "Set seat cooler to LEVEL (0-3) for SEAT (front-left or front-right)",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "LEVEL", help: "Cooling level 0 (off) to 3 (high)"},
+			{name: "SEAT", help: "'front-left' or 'front-right'"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			level, err := strconv.Atoi(args["LEVEL"])
+			if err != nil || level < 0 || level > 3 {
+				return fmt.Errorf("seat cooler level must be an integer 0-3")
+			}
+			var seat vehicle.SeatPosition
+			switch strings.ToLower(args["SEAT"]) {
+			case "front-left", "l":
+				seat = vehicle.SeatFrontLeft
+			case "front-right", "r":
+				seat = vehicle.SeatFrontRight
+			default:
+				return fmt.Errorf("seat must be 'front-left' or 'front-right'")
+			}
+			return car.SetSeatCooler(ctx, vehicle.Level(level), seat)
+		},
+	},
 	"climate-set-temp": {
 		help:             "Set temperature (Celsius)",
 		requiresAuth:     true,

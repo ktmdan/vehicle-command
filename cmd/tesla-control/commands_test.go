@@ -56,6 +56,18 @@ func TestClimateKeeperAndSunroofCommands(t *testing.T) {
 	}
 }
 
+func TestComfortParityCommands(t *testing.T) {
+	for _, name := range []string{
+		"cabin-overheat-protection",
+		"cop-temp",
+		"bioweapon-mode",
+		"precondition-max",
+		"seat-cooler",
+	} {
+		requireCommand(t, name)
+	}
+}
+
 func TestGetDays(t *testing.T) {
 	type params struct {
 		str   string
