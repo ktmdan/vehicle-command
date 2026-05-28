@@ -86,3 +86,24 @@ func TestParseConfig(t *testing.T) {
 		assertEquals(t, 60*time.Second, httpConfig.timeout, "timeout")
 	})
 }
+
+func TestDisableTLSEnv(t *testing.T) {
+	orig := os.Getenv(EnvDisableTLS)
+	defer os.Setenv(EnvDisableTLS, orig)
+
+	// Default: TLS enabled.
+	httpConfig.tls = true
+	os.Unsetenv(EnvDisableTLS)
+	if err := readFromEnvironment(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertEquals(t, true, httpConfig.tls, "tls default")
+
+	// Env opt-out disables TLS.
+	httpConfig.tls = true
+	os.Setenv(EnvDisableTLS, "true")
+	if err := readFromEnvironment(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	assertEquals(t, false, httpConfig.tls, "tls after disable env")
+}

@@ -22,18 +22,25 @@ const (
 )
 
 const (
-	EnvTLSCert = "TESLA_HTTP_PROXY_TLS_CERT"
-	EnvTLSKey  = "TESLA_HTTP_PROXY_TLS_KEY"
-	EnvHost    = "TESLA_HTTP_PROXY_HOST"
-	EnvPort    = "TESLA_HTTP_PROXY_PORT"
-	EnvTimeout = "TESLA_HTTP_PROXY_TIMEOUT"
-	EnvVerbose = "TESLA_VERBOSE"
+	EnvTLSCert    = "TESLA_HTTP_PROXY_TLS_CERT"
+	EnvTLSKey     = "TESLA_HTTP_PROXY_TLS_KEY"
+	EnvHost       = "TESLA_HTTP_PROXY_HOST"
+	EnvPort       = "TESLA_HTTP_PROXY_PORT"
+	EnvTimeout    = "TESLA_HTTP_PROXY_TIMEOUT"
+	EnvVerbose    = "TESLA_VERBOSE"
+	EnvDisableTLS = "TESLA_HTTP_PROXY_DISABLE_TLS"
 )
 
 const nonLocalhostWarning = `
 Do not listen on a network interface without adding client authentication. Unauthorized clients may
 be used to create excessive traffic from your IP address to Tesla's servers, which Tesla may respond
 to by rate limiting or blocking your connections.`
+
+const tlsDisabledWarning = `
+WARNING: TLS is DISABLED. This server is serving PLAINTEXT HTTP. Client traffic,
+including OAuth tokens, is unencrypted. Only do this behind TLS-terminating
+infrastructure (e.g. a reverse proxy or cloud load balancer) on a trusted
+network. (Outbound requests to Tesla remain HTTPS.)`
 
 type HTTProxyConfig struct {
 	keyFilename  string
@@ -42,6 +49,7 @@ type HTTProxyConfig struct {
 	host         string
 	port         int
 	timeout      time.Duration
+	tls          bool
 }
 
 var (
@@ -55,6 +63,7 @@ func init() {
 	flag.StringVar(&httpConfig.host, "host", "localhost", "Proxy server `hostname`")
 	flag.IntVar(&httpConfig.port, "port", defaultPort, "`Port` to listen on")
 	flag.DurationVar(&httpConfig.timeout, "timeout", proxy.DefaultTimeout, "Timeout interval when sending commands")
+	flag.BoolVar(&httpConfig.tls, "tls", true, "Serve over HTTPS. Set -tls=false to serve plaintext HTTP (INSECURE)")
 }
 
 func Usage() {
@@ -70,16 +79,13 @@ func Usage() {
 
 func main() {
 	// ******************************************************************************************
-	// WHY IS THERE NO OPTION FOR DISABLING TLS?
+	// DISABLING TLS
 	// ******************************************************************************************
-	// In the past, we have had problems with third-party applications that made it easy for DIY
-	// enthusiasts to inadvertently expose their vehicles to the public Internet. In order to
-	// protect users who do not understand the risks of disabling TLS, we decided to omit an
-	// --insecure flag or similar.
-	//
-	// Expert users who need to disable TLS can do so without forking this repository by using the
-	// pkg/proxy package, which is agnostic to TLS. This application is a very thin wrapper around
-	// that package.
+	// TLS is ON by default. Expert users running behind TLS-terminating infrastructure can
+	// disable it with -tls=false (or TESLA_HTTP_PROXY_DISABLE_TLS=true). When disabled the proxy
+	// serves plaintext HTTP and prints a warning. Do NOT expose a plaintext proxy to untrusted
+	// networks: unauthorized clients can generate traffic to Tesla from your IP and your OAuth
+	// tokens travel unencrypted.
 
 	config, err := cli.NewConfig(cli.FlagPrivateKey)
 
@@ -119,17 +125,19 @@ func main() {
 		return
 	}
 
-	if tlsPublicKey, err := protocol.LoadPublicKey(httpConfig.keyFilename); err == nil {
-		if bytes.Equal(tlsPublicKey.Bytes(), skey.PublicBytes()) {
-			fmt.Fprintln(os.Stderr, "It is unsafe to use the same private key for TLS and command authentication.")
-			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, "Generate a new TLS key for this server.")
-			return
+	if httpConfig.tls {
+		if tlsPublicKey, err := protocol.LoadPublicKey(httpConfig.keyFilename); err == nil {
+			if bytes.Equal(tlsPublicKey.Bytes(), skey.PublicBytes()) {
+				fmt.Fprintln(os.Stderr, "It is unsafe to use the same private key for TLS and command authentication.")
+				fmt.Fprintln(os.Stderr, "")
+				fmt.Fprintln(os.Stderr, "Generate a new TLS key for this server.")
+				return
+			}
+			log.Debug("Verified that TLS key is not the same as the command-authentication key.")
+		} else {
+			// Discarding the error here is deliberate
+			log.Debug("Verified that TLS key is not a recycled command-authentication key, because it is not NIST P256.")
 		}
-		log.Debug("Verified that TLS key is not the same as the command-authentication key.")
-	} else {
-		// Discarding the error here is deliberate
-		log.Debug("Verified that TLS key is not a recycled command-authentication key, because it is not NIST P256.")
 	}
 
 	log.Debug("Creating proxy")
@@ -147,7 +155,12 @@ func main() {
 	// method of your implementation can perform your business logic and then, if the request is
 	// authorized, invoke p.ServeHTTP. Finally, replace p in the below ListenAndServeTLS call with
 	// an object of your newly created type.
-	log.Error("Server stopped: %s", http.ListenAndServeTLS(addr, httpConfig.certFilename, httpConfig.keyFilename, p))
+	if httpConfig.tls {
+		log.Error("Server stopped: %s", http.ListenAndServeTLS(addr, httpConfig.certFilename, httpConfig.keyFilename, p))
+	} else {
+		fmt.Fprintln(os.Stderr, tlsDisabledWarning)
+		log.Error("Server stopped: %s", http.ListenAndServe(addr, p))
+	}
 }
 
 // readConfig applies configuration from environment variables.
@@ -190,6 +203,12 @@ func readFromEnvironment() error {
 			if err != nil {
 				return fmt.Errorf("invalid timeout: %s", timeoutEnv)
 			}
+		}
+	}
+
+	if httpConfig.tls {
+		if v, ok := os.LookupEnv(EnvDisableTLS); ok && v != "false" && v != "0" {
+			httpConfig.tls = false
 		}
 	}
 
