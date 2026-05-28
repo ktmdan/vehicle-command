@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strconv"
 	"testing"
+
+	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
 
 func TestMinutesAfterMidnight(t *testing.T) {
@@ -92,5 +94,34 @@ func TestGetDays(t *testing.T) {
 		} else if mask != test.mask {
 			t.Errorf("day string '%s' gave mask %s instead of %s", test.str, strconv.FormatInt(int64(mask), 2), strconv.FormatInt(int64(test.mask), 2))
 		}
+	}
+}
+
+func TestChargeParityCommands(t *testing.T) {
+	for _, name := range []string{
+		"charge-max-range",
+		"charge-standard",
+		"schedule-departure",
+		"clear-scheduled-departure",
+	} {
+		requireCommand(t, name)
+	}
+}
+
+func TestParseChargingPolicy(t *testing.T) {
+	cases := map[string]vehicle.ChargingPolicy{
+		"":         vehicle.ChargingPolicyOff,
+		"off":      vehicle.ChargingPolicyOff,
+		"all":      vehicle.ChargingPolicyAllDays,
+		"weekdays": vehicle.ChargingPolicyWeekdays,
+	}
+	for in, want := range cases {
+		got, err := parseChargingPolicy(in)
+		if err != nil || got != want {
+			t.Errorf("parseChargingPolicy(%q) = %v, %v; want %v, nil", in, got, err, want)
+		}
+	}
+	if _, err := parseChargingPolicy("bogus"); err == nil {
+		t.Errorf("parseChargingPolicy(\"bogus\") should error")
 	}
 }

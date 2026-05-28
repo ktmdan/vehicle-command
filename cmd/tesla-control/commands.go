@@ -89,6 +89,19 @@ func GetCategory(nameStr string) (vehicle.StateCategory, error) {
 	return 0, fmt.Errorf("unrecognized state category '%s'", nameStr)
 }
 
+func parseChargingPolicy(s string) (vehicle.ChargingPolicy, error) {
+	switch strings.ToLower(s) {
+	case "", "off":
+		return vehicle.ChargingPolicyOff, nil
+	case "all", "alldays", "all-days":
+		return vehicle.ChargingPolicyAllDays, nil
+	case "weekdays":
+		return vehicle.ChargingPolicyWeekdays, nil
+	default:
+		return vehicle.ChargingPolicyOff, fmt.Errorf("policy must be one of: off, all, weekdays")
+	}
+}
+
 func GetDegree(degStr string) (float32, error) {
 	deg, err := strconv.ParseFloat(degStr, 32)
 	if err != nil {
@@ -1001,6 +1014,68 @@ var commands = map[string]*Command{
 		requiresFleetAPI: false,
 		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
 			return car.CloseChargePort(ctx)
+		},
+	},
+	"charge-max-range": {
+		help:             "Charge to max range",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
+			return car.ChargeMaxRange(ctx)
+		},
+	},
+	"charge-standard": {
+		help:             "Charge to standard range limit",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
+			return car.ChargeStandardRange(ctx)
+		},
+	},
+	"schedule-departure": {
+		help:             "Schedule departure at DEPART_MIN minutes after midnight",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "DEPART_MIN", help: "Departure time in minutes after midnight (0-1440)"},
+		},
+		optional: []Argument{
+			{name: "OFF_PEAK_END_MIN", help: "Off-peak end time in minutes after midnight (default 0)"},
+			{name: "PRECONDITION", help: "Preconditioning policy: off (default), all, or weekdays"},
+			{name: "OFF_PEAK", help: "Off-peak charging policy: off (default), all, or weekdays"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			departMin, err := strconv.Atoi(args["DEPART_MIN"])
+			if err != nil {
+				return fmt.Errorf("error parsing DEPART_MIN")
+			}
+			offPeakEndMin := 0
+			if v, ok := args["OFF_PEAK_END_MIN"]; ok && v != "" {
+				offPeakEndMin, err = strconv.Atoi(v)
+				if err != nil {
+					return fmt.Errorf("error parsing OFF_PEAK_END_MIN")
+				}
+			}
+			precondition, err := parseChargingPolicy(args["PRECONDITION"])
+			if err != nil {
+				return fmt.Errorf("PRECONDITION: %s", err)
+			}
+			offpeak, err := parseChargingPolicy(args["OFF_PEAK"])
+			if err != nil {
+				return fmt.Errorf("OFF_PEAK: %s", err)
+			}
+			return car.ScheduleDeparture(ctx,
+				time.Duration(departMin)*time.Minute,
+				time.Duration(offPeakEndMin)*time.Minute,
+				precondition, offpeak)
+		},
+	},
+	"clear-scheduled-departure": {
+		help:             "Disable scheduled departure",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
+			return car.ClearScheduledDeparture(ctx)
 		},
 	},
 	"autosecure-modelx": {
