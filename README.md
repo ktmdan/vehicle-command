@@ -236,10 +236,14 @@ openssl req -x509 -nodes -newkey ec \
 
 This command creates an unencrypted private key, `config/tls-key.pem`.
 
-The proxy server requires TLS. We do not offer an option to disable TLS because
-this greatly increases the risk of non-experts creating insecure deployments.
-Expert users who need a non-TLS version can create one without forking the
-repository by using
+The proxy server uses TLS by default. Expert users running behind TLS-terminating
+infrastructure (a reverse proxy, ingress, or cloud load balancer) can opt out
+with `-tls=false` or the `TESLA_HTTP_PROXY_DISABLE_TLS=true` environment
+variable. The proxy then serves plaintext HTTP and prints a startup warning; do
+NOT expose a plaintext proxy to untrusted networks — unauthorized clients can
+generate traffic from your IP and OAuth tokens travel unencrypted. Outbound
+requests to Tesla remain HTTPS. Expert users who need deeper customization can
+build directly on
 [pkg/proxy](https://pkg.go.dev/github.com/teslamotors/vehicle-command/pkg/proxy);
 the [proxy source code](cmd/tesla-http-proxy/main.go) may be a helpful starting
 point.
@@ -314,9 +318,15 @@ Legacy clients written for Owner API may be using a vehicle's Owner API ID when
 constructing URL paths. The proxy server requires clients to use the VIN
 directly, instead.
 
+See [doc/command-coverage.md](doc/command-coverage.md) for a Fleet API ↔ proxy
+↔ tesla-control coverage matrix.
+
 ## Using the Golang library
 
 You can read package [documentation on pkg.go.dev](https://pkg.go.dev/github.com/teslamotors/vehicle-command/pkg).
+
+Library consumers can control verbosity by calling `log.SetLevel` from
+`github.com/teslamotors/vehicle-command/pkg/log`.
 
 This repository supports `go mod` and follows [Go version
 semantics](https://go.dev/doc/modules/version-numbers). Note that v0.x.x
