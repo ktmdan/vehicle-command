@@ -120,6 +120,17 @@ func TestChargeParityCommands(t *testing.T) {
 	}
 }
 
+func TestPINCommands(t *testing.T) {
+	for _, name := range []string{
+		"pin-to-drive",
+		"clear-pin-to-drive",
+		"reset-pin-to-drive-pin",
+		"reset-valet-pin",
+	} {
+		requireCommand(t, name)
+	}
+}
+
 func TestParseChargingPolicy(t *testing.T) {
 	cases := map[string]vehicle.ChargingPolicy{
 		"":         vehicle.ChargingPolicyOff,

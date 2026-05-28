@@ -305,6 +305,56 @@ var commands = map[string]*Command{
 			return car.DisableValetMode(ctx)
 		},
 	},
+	"pin-to-drive": {
+		help:             "Enable or disable PIN to Drive. STATE 'on' requires PIN.",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		args: []Argument{
+			{name: "STATE", help: "'on' or 'off'"},
+		},
+		optional: []Argument{
+			{name: "PIN", help: "4-digit PIN (required when enabling)"},
+		},
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, args map[string]string) error {
+			var enabled bool
+			switch strings.ToLower(args["STATE"]) {
+			case "on":
+				enabled = true
+			case "off":
+				enabled = false
+			default:
+				return fmt.Errorf("pin-to-drive state must be 'on' or 'off'")
+			}
+			if enabled && args["PIN"] == "" {
+				return fmt.Errorf("a PIN is required when enabling PIN to Drive")
+			}
+			return car.SetPINToDrive(ctx, enabled, args["PIN"])
+		},
+	},
+	"clear-pin-to-drive": {
+		help:             "Deactivate PIN to Drive and clear the PIN (requires owner/fleet-manager)",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
+			return car.ClearPINToDrive(ctx)
+		},
+	},
+	"reset-pin-to-drive-pin": {
+		help:             "Remove PIN to Drive",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
+			return car.ResetPIN(ctx)
+		},
+	},
+	"reset-valet-pin": {
+		help:             "Remove the Valet Mode PIN",
+		requiresAuth:     true,
+		requiresFleetAPI: false,
+		handler: func(ctx context.Context, _ *account.Account, car *vehicle.Vehicle, _ map[string]string) error {
+			return car.ResetValetPin(ctx)
+		},
+	},
 	"unlock": {
 		help:             "Unlock vehicle",
 		requiresAuth:     true,
