@@ -28,7 +28,7 @@ import (
 
 const (
 	DefaultTimeout       = 10 * time.Second
-	maxRequestBodyBytes  = 512
+	maxRequestBodyBytes  = 1 << 20
 	vinLength            = 17
 	proxyProtocolVersion = "tesla-http-proxy/1.1.0"
 	MaxResponseLength    = 10000000
@@ -36,6 +36,34 @@ const (
 )
 
 var h2Prefix = "h2=https://"
+
+// httpDoer is the subset of *http.Client used by forwardRequest. Interface extracted to facilitate
+// testing.
+type httpDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// vehicleSession is the subset of *vehicle.Vehicle used by handleVehicleCommand. Interface
+// extracted to facilitate testing.
+type vehicleSession interface {
+	Connect(ctx context.Context) error
+	Disconnect()
+	StartSession(ctx context.Context) error
+	UpdateCachedSessions(c *cache.SessionCache) error
+	Execute(command func(*vehicle.Vehicle) error) error
+}
+
+type liveVehicle struct {
+	*vehicle.Vehicle
+}
+
+func (v *liveVehicle) StartSession(ctx context.Context) error {
+	return v.Vehicle.StartSession(ctx, nil)
+}
+
+func (v *liveVehicle) Execute(command func(*vehicle.Vehicle) error) error {
+	return command(v.Vehicle)
+}
 
 func getAccount(req *http.Request) (*account.Account, error) {
 	token, ok := strings.CutPrefix(req.Header.Get("Authorization"), "Bearer ")
@@ -54,6 +82,10 @@ type Proxy struct {
 	vinLock          sync.Map
 	unsupported      sync.Map
 	domainForSubject sync.Map
+
+	// client and fetchVehicle are overridable for tests.
+	client       httpDoer
+	fetchVehicle func(ctx context.Context, acct *account.Account, vin string) (vehicleSession, error)
 }
 
 func (p *Proxy) updateDomainForSubject(subject, domain string) {
@@ -111,11 +143,25 @@ func (p *Proxy) unlockVIN(vin string) {
 // Vehicles must have the public part of skey enrolled on their keychains. (This is a
 // command-authentication key, not a TLS key.)
 func New(_ context.Context, skey protocol.ECDHPrivateKey, cacheSize int) (*Proxy, error) {
-	return &Proxy{
+	p := &Proxy{
 		Timeout:    DefaultTimeout,
 		commandKey: skey,
 		sessions:   cache.New(cacheSize),
-	}, nil
+		client:     &http.Client{},
+	}
+	p.fetchVehicle = p.defaultFetchVehicle
+	return p, nil
+}
+
+func (p *Proxy) defaultFetchVehicle(ctx context.Context, acct *account.Account, vin string) (vehicleSession, error) {
+	car, err := acct.GetVehicle(ctx, vin, p.commandKey, p.sessions)
+	if err != nil {
+		return nil, err
+	}
+	if car == nil {
+		return nil, nil
+	}
+	return &liveVehicle{Vehicle: car}, nil
 }
 
 // Response contains a server's response to a client request.
@@ -210,6 +256,11 @@ func (p *Proxy) forwardRequest(acct *account.Account, w http.ResponseWriter, req
 	if req.Body != nil {
 		requestBody, err = io.ReadAll(req.Body)
 		if err != nil {
+			var maxBytesErr *http.MaxBytesError
+			if errors.As(err, &maxBytesErr) {
+				writeJSONError(w, http.StatusRequestEntityTooLarge, err)
+				return
+			}
 			writeJSONError(w, http.StatusBadGateway, err)
 			return
 		}
@@ -219,8 +270,7 @@ func (p *Proxy) forwardRequest(acct *account.Account, w http.ResponseWriter, req
 	for {
 		proxyReq.URL.Host = acct.Host
 		log.Debug("Forwarding request to %s", proxyReq.URL.String())
-		client := http.Client{}
-		result, err := client.Do(proxyReq)
+		result, err := p.client.Do(proxyReq)
 
 		if err != nil {
 			if urlErr, ok := err.(*url.Error); ok && urlErr.Timeout() {
@@ -277,6 +327,7 @@ func (p *Proxy) forwardRequest(acct *account.Account, w http.ResponseWriter, req
 		attempts++
 		if attempts == MaxAttempts {
 			writeJSONError(w, http.StatusBadGateway, protocol.NewError("max retry exhausted", false, false))
+			return
 		}
 
 		log.Debug("Retrying transmission after error...")
@@ -292,6 +343,8 @@ func (p *Proxy) forwardRequest(acct *account.Account, w http.ResponseWriter, req
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	log.Info("Received %s request for %s", req.Method, req.URL.Path)
+
+	req.Body = http.MaxBytesReader(w, req.Body, maxRequestBodyBytes)
 
 	if req.URL.Path == "/health" {
 		p.handleHealthCheck(w, req)
@@ -394,6 +447,11 @@ func (p *Proxy) handleFleetTelemetryConfig(acct *account.Account, w http.Respons
 	}()
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			writeJSONError(w, http.StatusRequestEntityTooLarge, err)
+			return
+		}
 		writeJSONError(w, http.StatusBadRequest, fmt.Errorf("could not read request body: %s", err))
 		return
 	}
@@ -408,7 +466,7 @@ func (p *Proxy) handleFleetTelemetryConfig(acct *account.Account, w http.Respons
 
 	// Let the server validate the VINs and config, the proxy just needs to sign
 	if _, ok := params.Config["aud"]; ok {
-		log.Warning("Confuration 'aud' field will be overwritten")
+		log.Warning("Configuration 'aud' field will be overwritten")
 	}
 	if _, ok := params.Config["iss"]; ok {
 		log.Warning("Configuration 'iss' field will be overwritten")
@@ -461,7 +519,7 @@ func (p *Proxy) handleVehicleCommand(acct *account.Account, w http.ResponseWrite
 	}
 	defer car.Disconnect()
 
-	if err := car.StartSession(ctx, nil); errors.Is(err, protocol.ErrProtocolNotSupported) {
+	if err := car.StartSession(ctx); errors.Is(err, protocol.ErrProtocolNotSupported) {
 		p.markUnsupportedVIN(vin)
 		p.forwardRequest(acct, w, req)
 		return err
@@ -473,7 +531,7 @@ func (p *Proxy) handleVehicleCommand(acct *account.Account, w http.ResponseWrite
 		_ = car.UpdateCachedSessions(p.sessions)
 	}()
 
-	if err = commandToExecuteFunc(car); err == ErrCommandUseRESTAPI {
+	if err = car.Execute(commandToExecuteFunc); err == ErrCommandUseRESTAPI {
 		return err
 	}
 	if protocol.IsNominalError(err) {
@@ -492,7 +550,7 @@ func (p *Proxy) handleVehicleCommand(acct *account.Account, w http.ResponseWrite
 }
 
 func (p *Proxy) loadVehicleAndCommandFromRequest(ctx context.Context, acct *account.Account, w http.ResponseWriter, req *http.Request,
-	command, vin string) (*vehicle.Vehicle, func(*vehicle.Vehicle) error, error) {
+	command, vin string) (vehicleSession, func(*vehicle.Vehicle) error, error) {
 
 	log.Debug("Executing %s on %s", command, vin)
 	if req.Method != http.MethodPost {
@@ -502,32 +560,38 @@ func (p *Proxy) loadVehicleAndCommandFromRequest(ctx context.Context, acct *acco
 
 	commandToExecuteFunc, err := extractCommandAction(ctx, req, command)
 	if err != nil {
-		if err == ErrCommandUseRESTAPI {
-			// Caller (ServeHTTP) will forward the request to the REST API.
+		if errors.Is(err, ErrCommandUseRESTAPI) {
+			// Let ServeHTTP fall back to forwarding the original request.
 			return nil, nil, err
 		}
 		writeJSONError(w, http.StatusBadRequest, err)
 		return nil, nil, err
 	}
 
-	car, err := acct.GetVehicle(ctx, vin, p.commandKey, p.sessions)
+	car, err := p.fetchVehicle(ctx, acct, vin)
 	if err != nil || car == nil {
+		if err == nil {
+			err = errors.New("vehicle not available")
+		}
 		writeJSONError(w, http.StatusInternalServerError, err)
 		return nil, nil, err
 	}
 
-	return car, commandToExecuteFunc, err
+	return car, commandToExecuteFunc, nil
 }
 
 func extractCommandAction(ctx context.Context, req *http.Request, command string) (func(*vehicle.Vehicle) error, error) {
 	var params RequestParameters
 	body, err := io.ReadAll(req.Body)
 	if err != nil {
+		var maxBytesErr *http.MaxBytesError
+		if errors.As(err, &maxBytesErr) {
+			return nil, &inet.HTTPError{Code: http.StatusRequestEntityTooLarge, Message: err.Error()}
+		}
 		return nil, &inet.HTTPError{Code: http.StatusBadRequest, Message: "could not read request body"}
 	}
-	// Reset the body so the request can still be forwarded to Tesla's REST API
-	// on any REST-forward path (ErrCommandUseRESTAPI, unsupported protocol,
-	// unknown command).
+	// Restore the body so fallbacks that forward the request (REST API / unsupported protocol)
+	// still have the original payload.
 	req.Body = io.NopCloser(bytes.NewReader(body))
 	if len(body) > 0 {
 		if err := json.Unmarshal(body, &params); err != nil {

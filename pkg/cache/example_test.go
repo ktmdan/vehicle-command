@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/teslamotors/vehicle-command/pkg/cache"
-	"github.com/teslamotors/vehicle-command/pkg/connector/ble"
+	"github.com/teslamotors/vehicle-command/pkg/connector/inet"
 	"github.com/teslamotors/vehicle-command/pkg/protocol"
 	"github.com/teslamotors/vehicle-command/pkg/vehicle"
 )
@@ -14,15 +14,14 @@ func Example() {
 	const cacheFilename = "my_cache.json"
 	const privateKeyFilename = "private_key.pem"
 
-	conn, err := ble.NewConnection(context.Background(), "myvin123")
-	if err != nil {
-		panic(err)
-	}
+	// A BLE connection (ble.NewConnection(ctx, "myvin123")) works the same way;
+	// inet is used here so this example has no third-party dependencies.
+	conn := inet.NewConnection("myvin123", "", "https://my-proxy.example.com", "my-agent")
 	defer conn.Close()
 
 	// Try to load cache from disk if it doesn't already exist
-	var myCache *cache.SessionCache
-	if myCache, err = cache.ImportFromFile(cacheFilename); err != nil {
+	myCache, err := cache.ImportFromFile(cacheFilename)
+	if err != nil {
 		myCache = cache.New(5) // Create a cache that holds sessions for up to five vehicles
 	}
 
